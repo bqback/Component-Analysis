@@ -16,11 +16,11 @@ class Spectrum:
         self.WN, self.KNa, self.Ka = data
         self.WN_min = min(self.WN)
         self.WN_max = max(self.WN)
-        self.num_point = len(self.WN)
+        self.num_points = len(self.WN)
 
     def __str__(self):
         header = f"{self.name}\nWN\t\tKNa\t\tKa\n"
-        data = "\n".join(
-            (f"{self.WN[idx]}\t{self.KNa[idx]}\t\t{self.Ka[idx]}" for idx, _ in enumerate(self.WN))
-        )
-        return header+data
+        # data = "\n".join(
+        #     (f"{self.WN[idx]}\t{self.KNa[idx]}\t\t{self.Ka[idx]}" for idx, _ in enumerate(self.WN))
+        # )
+        return header
