@@ -1,11 +1,11 @@
-from typing import List
+from typing import List, Tuple
 from pathlib import Path
 
 
-def parse(path: str, name: str) -> List:
-    dir_path = Path(path)
-    file_path = dir_path / name
-    with file_path.open('r') as file:
+def parse(filename: Path) -> Tuple[str, List]:
+    with filename.open('r') as file:
         lines = list(filter(None, (line.lstrip().rstrip() for line in file)))
-        trimmed_lines = list(filter(lambda s: s[0] != "#", lines))
-    return trimmed_lines
+        name = lines[1].lstrip("# ")
+        data = list(filter(lambda s: s[0] != "#", lines))
+    return name, data
+

@@ -10,12 +10,14 @@ class Spectrum:
     Ka: list[float] = field(init=False)
     WN_min: float = field(init=False)
     WN_max: float = field(init=False)
+    WN_step: float = field(init=False)
     num_points: float = field(init=False)
 
     def __post_init__(self, data):
         self.WN, self.KNa, self.Ka = data
         self.WN_min = min(self.WN)
         self.WN_max = max(self.WN)
+        self.WN_step = self.WN[1] - self.WN[0]
         self.num_points = len(self.WN)
 
     def __str__(self):

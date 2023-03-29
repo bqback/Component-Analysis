@@ -1,1 +1,1 @@
-from .calculate import calculate
+from .calculate import *

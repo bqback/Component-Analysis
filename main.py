@@ -1,39 +1,52 @@
 import processing
 import constants
 import classes
-from typing import List
+from typing import List, Dict
+import os
+import pathlib
 
 
-def gather_data(name: str) -> classes.Spectrum:
-    raw_data = processing.parse(constants.DATA_PATH, f'{name}.txt')
-    converted_data = processing.convert(raw_data)
-    return classes.Spectrum(name, converted_data)
+def gather_data() -> Dict[str, classes.Spectrum | List[classes.Spectrum]]:
+    spectra = []
+    print(constants.DATA_PATH)
+    for child in pathlib.Path(constants.DATA_PATH).iterdir():
+        if child.suffix == ".txt":
+            sample_name, raw_data = processing.parse(child)
+            converted_data = processing.convert(raw_data)
+            spectra.append(classes.Spectrum(sample_name, converted_data))
+    sample = list(filter(lambda s: "model" in s.name, spectra))
+    if not sample:
+        raise Exception(f'Data directory /{constants.DATA_PATH} did not contain a valid model spectrum file')
+    if len(sample) > 1:
+        raise Exception(f'Multiple model spectra files found in data directory /{constants.DATA_PATH}')
+    sample = sample[0]
+    spectra.remove(sample)
+    return {"sample": sample, "gasses": spectra}
 
 
-def check_data(data: List[classes.Spectrum]) -> bool:
+def check_data(data: Dict[str, classes.Spectrum | List[classes.Spectrum]]) -> bool:
     valid = True
-    sample = data[0]
-    for gas in data[1:]:
-        if sample.WN_min != gas.WN_min:
+    for gas in data["gasses"]:
+        if data["sample"].WN_min != gas.WN_min:
             print(f'Minimal wave number for spectra {gas.name} does not match \\'
                   f'the minimal wave number for the air sample \\'
-                  f'(expected {sample.WN_min}, got {gas.WN_min}')
+                  f'(expected {data["sample"].WN_min}, got {gas.WN_min}')
             valid = False
             # raise ValueError(f'Minimal wave number for spectra {gas.name} does not match \\'
             #                  f'the minimal wave number for the air sample \\'
             #                  f'(expected {sample.WN_min}, got {gas.WN_min}')
-        if sample.WN_max != gas.WN_max:
+        if data["sample"].WN_max != gas.WN_max:
             print(f'Maximum wave number for spectra {gas.name} does not match \\'
                   f'the maximum wave number for the air sample \\'
-                  f'(expected {sample.WN_max}, got {gas.WN_max}')
+                  f'(expected {data["sample"].WN_max}, got {gas.WN_max}')
             valid = False
             # raise ValueError(f'Maximum wave number for spectra {gas.name} does not match \\'
             #                  f'the maximum wave number for the air sample \\'
             #                  f'(expected {sample.WN_max}, got {gas.WN_max}')
-        if sample.num_points != gas.num_points:
+        if data["sample"].num_points != gas.num_points:
             print(f'Number of data points for spectra {gas.name} does not match \\'
                   f'the number of data points for the air sample \\'
-                  f'(expected {sample.num_points}, got {gas.num_points}')
+                  f'(expected {data["sample"].num_points}, got {gas.num_points}')
             valid = False
             # raise ValueError(f'Number of data points for spectra {gas.name} does not match \\'
             #                  f'the number of data points for the air sample \\'
@@ -42,12 +55,7 @@ def check_data(data: List[classes.Spectrum]) -> bool:
 
 
 def main() -> None:
-    spectra = []
-    air_model = gather_data(constants.MODEL)
-    spectra.append(air_model)
-    for gas in constants.GAS_LIST:
-        spectrum = gather_data(gas)
-        spectra.append(spectrum)
+    spectra = gather_data()
     if not check_data(spectra):
         raise ValueError('Unable to proceed due to data mismatch')
     else:
