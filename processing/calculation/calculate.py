@@ -2,6 +2,7 @@ import scipy as sp
 import numpy as np
 import classes
 import plotting
+from .ica import run_ica
 from typing import List, Dict
 
 
@@ -35,6 +36,9 @@ def y_vals(values, coefficients):
 
 def calculate(data: Dict[str, classes.Spectrum | List[classes.Spectrum]]):
     a = get_a(data["gasses"])
+
+    run_ica(a)
+
     b = np.array(data["sample"].KNa)
 
     res = sp.optimize.lsq_linear(a, b, bounds=(0, np.inf))
@@ -56,18 +60,27 @@ def calculate(data: Dict[str, classes.Spectrum | List[classes.Spectrum]]):
     print(f'\n\nSolving for 255th data point (highest peak)')
 
     print(f'\nlsq_linear solution')
-    result_lsql = value_at_point(data["gasses"], lsql, 254)
+    result_lsql = value_at_point(data["gasses"], res.x, 254)
+
+    print(f'\nlsq_linear solution, normalized')
+    result_lsql_norm = value_at_point(data["gasses"], lsql, 254)
 
     print(f'\nlsq_linear unbounded solution')
-    result_lsql_ub = value_at_point(data["gasses"], lsql_ub, 254)
+    result_lsql_ub = value_at_point(data["gasses"], res.unbounded_sol[0], 254)
+
+    print(f'\nlsq_linear unbounded solution, normalized')
+    result_lsql_ub_norm = value_at_point(data["gasses"], lsql_ub, 254)
 
     print(f'\nNNLS solution')
-    result_nnls = value_at_point(data["gasses"], nnls, 254)
+    result_nnls = value_at_point(data["gasses"], solution_nnls, 254)
+
+    print(f'\nNNLS solution, normalized')
+    result_nnls_norm = value_at_point(data["gasses"], nnls, 254)
 
     print(f'\nSample:\t\t\t\t{data["sample"].KNa[254]}')
-    print(f'LSQ_L result:\t\t{result_lsql}')
-    print(f'LSQ_L_UB result:\t{result_lsql_ub}')
-    print(f'NNLS result:\t\t{result_nnls}')
+    print(f'LSQ_L result:\t\t{result_lsql}\t\t normalized\t\t{result_lsql_norm}')
+    print(f'LSQ_L_UB result:\t{result_lsql_ub}\t\t normalized\t\t{result_lsql_ub_norm}')
+    print(f'NNLS result:\t\t{result_nnls}\t\t normalized\t\t{result_nnls_norm}')
 
     plotting.plot_data(data["sample"],
                        data["gasses"],
