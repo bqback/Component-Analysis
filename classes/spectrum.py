@@ -1,20 +1,21 @@
 from dataclasses import dataclass, field, InitVar
+import numpy as np
 
 
 @dataclass
 class Spectrum:
     name: str
-    data: InitVar[list[tuple[float]]]
-    WN: list[float] = field(init=False)
-    KNa: list[float] = field(init=False)
-    Ka: list[float] = field(init=False)
+    data: InitVar[np.ndarray]
+    WN: np.ndarray = field(init=False)
+    XS: np.ndarray = field(init=False)
+    Absorbance: np.ndarray = field(init=False)
     WN_min: float = field(init=False)
     WN_max: float = field(init=False)
     WN_step: float = field(init=False)
-    num_points: float = field(init=False)
+    num_points: int = field(init=False)
 
     def __post_init__(self, data):
-        self.WN, self.KNa, self.Ka = data
+        self.WN, self.XS, self.Absorbance = data
         self.WN_min = min(self.WN)
         self.WN_max = max(self.WN)
         self.WN_step = self.WN[1] - self.WN[0]
