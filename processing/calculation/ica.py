@@ -25,6 +25,9 @@ def covariance(x):
 
 def correlation(unknown, sources, nica):
     Cor = np.zeros((nica, sources.shape[0]))
+
+    print(unknown.shape)
+    print(sources.shape)
     # Matching
     for ii in range(nica):
         for jj in range(sources.shape[0]):
@@ -106,7 +109,7 @@ def run_ica(source_spectra, sample_spectra):
                            source_spectra[0].WN_max,
                            source_spectra[0].num_points
                            )
-    source_data = np.array([source.Absorbance for source in source_spectra])
+    source_data, _ = processing.get_a(source_spectra)
     sample_data_preserve = np.array([sample.Absorbance for sample in sample_spectra])
     sample_data = sample_data_preserve * 1
     noisy_samples = np.array([processing.add_noise(sample, snr_db=SNR) for sample in sample_data_preserve])
@@ -121,27 +124,40 @@ def run_ica(source_spectra, sample_spectra):
     means = noisy_samples.mean(1)
     stdsqr = np.sqrt(noisy_samples.std(1))
     for i in range(noisy_samples.shape[0]):
-        noisy_samples[i, :] /= noisy_samples[i, :].max()
+        print(f"Before scale max {noisy_samples[i].max()}")
+        noisy_samples[i, :] /= noisy_samples[i, np.where(wn_space >= 2328)[0][0]]
+        print(f"After scale max {noisy_samples[i].max()}")
         noisy_samples[i, :] = (noisy_samples[i, :] - means[i]) / stdsqr[i]
+    for i in range(noisy_samples.shape[0]):
+        print(noisy_samples[i].max())
     noisy_derivative = np.array([processing.derive(sample, order=2) for sample in noisy_samples])
 
     eps_fig, eps_ax = plt.subplots(1, 1)
     snr_range = np.arange(20, 120, 10)
     eps = []
+    sk = []
     for idx, samples in enumerate(noisy_data):
         u, sv, v = np.linalg.svd(samples, full_matrices=True)
         s = np.zeros(samples.shape)
         np.fill_diagonal(s, sv, wrap=True)
         n = np.linalg.norm(samples, ord=1)
         e = np.zeros(samples.shape[0])
+        sk_sum = []
         for nn in range(samples.shape[0]):
             Rec = u @ s[:, :nn + 1] @ v[:nn + 1, :]
+            sk_sum.append(np.sum(s[:, :nn+1])/np.sum(s))
             e[nn] = np.linalg.norm(samples - Rec, ord=1) / n
+        print(sk_sum)
         eps.append(e)
+        sk.append(sk_sum)
     eps_k = np.array(eps).T
     for k_val in range(eps_k.shape[0]):
         color = (1, 0, 0) if k_val == 10 else (0, 0, k_val/eps_k.shape[0])
         eps_ax.plot(snr_range, np.log10(eps_k[k_val]), color=color)
+    sk_fig, sk_ax = plt.subplots(1, 1)
+    k_range = np.arange(1, noisy_data[0].shape[0]+1, 1)
+    for idx, sk_val in enumerate(sk):
+        sk_ax.plot(k_range, sk_val, color=(0, 0, idx/len(sk)))
 
     u, sv, v = np.linalg.svd(noisy_samples, full_matrices=True)
     s = np.zeros(noisy_samples.shape)
@@ -155,7 +171,8 @@ def run_ica(source_spectra, sample_spectra):
     source_num = np.max([sum(e >= 1e-7) + 1, sum(de < -1e-7)])
     print(source_num)
     tic = time.time()
-    ica = FastICA(fun='logcosh', n_components=source_num, tol=1e-10, max_iter=5000, whiten='unit-variance')
+    ica = FastICA(fun='logcosh', n_components=10, tol=1e-10, max_iter=5000,
+                  whiten='arbitrary-variance')
     ica.fit_transform(noisy_derivative.T)
     mixed_est = ica.mixing_
     toc = time.time()
@@ -166,13 +183,17 @@ def run_ica(source_spectra, sample_spectra):
     source_der_ICA = np.linalg.pinv(mixed_est) @ noisy_derivative
     mixed_est *= stdsqr.reshape(-1, 1)
     mixed_ICA = mixed_est
-
+    # for i in range(mixed_est.shape[0]):
+    #     fig = plt.figure("ICA test")
+    #     plt.subplot(1, 1, 1)
+    #     y_values = processing.y_vals(source_data, mixed_est[i])
+    #     plt.plot(wn_space, y_values)
     # MCR
     tic = time.time()
     print(noisy_norm.max())
     mcrals = McrAR(c_regr=linear_model.ElasticNet(alpha=1e-5, l1_ratio=0.75), max_iter=700,
                    tol_err_change=noisy_norm.max() * 1e-8, st_regr='NNLS',
-                   c_constraints=[ConstraintNonneg()])
+                   c_constraints=[ConstraintNonneg(), ConstraintNorm()])
     print(noisy_norm.shape)
     print(source_ICA.shape)
     mcrals.fit(noisy_norm, ST=source_ICA**2)
@@ -182,16 +203,20 @@ def run_ica(source_spectra, sample_spectra):
     mixed_MCR = mcrals.C_opt_
     source_der_MCR = (np.linalg.pinv(mixed_MCR) @ noisy_derivative)
 
-    Cor = correlation(source_MCR, source_data, source_num)
-    print(source_MCR.shape)
-    print(source_data.shape)
-    print(Cor)
+    print(f"source MCR shape {source_MCR.shape}")
+    print(f"source data shape {source_data.shape}")
+
+    Cor = correlation(source_MCR, source_data.T, source_num)
     I = Cor.argmax(1)
-    print(I)
     Ivalues = Cor.max(1)
     I.sort()
     I = np.unique(I)
-    print(I)
+    L = source_data[I, :]
+    reg = linear_model.Lasso(alpha=1e-1, max_iter=int(2e4), positive=True)
+    reg.fit(L.T, noisy_norm.T)
+    G = reg.coef_
+    Gn = G / G.sum(1)[:, None] * 100
+    print(Gn)
     # sample_centered, mean = center(sample_data)
     # sample_whitened, whiteCoeff = whiten(sample_centered)
     # print(np.round(covariance(sample_whitened)))

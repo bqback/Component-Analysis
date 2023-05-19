@@ -3,6 +3,7 @@ import numpy as np
 import classes
 import plotting
 from .ica import run_ica
+from .jade import jadeR
 from constants import TRUE_SOLUTION, CONSTRAINT_TYPES, SNR, REQUIRED_SAMPLES
 from typing import List, Dict
 import matplotlib.pyplot as plt
@@ -82,7 +83,7 @@ def get_spectra_array(spectra_classes: List[classes.Spectrum]):
     return np.array([spectrum.Absorbance for spectrum in spectra_classes])
 
 
-def generate_coefficients() -> Dict[str, int]:
+def generate_coefficients() -> Dict[str, float]:
     ch4 = max(1e-12, np.random.normal(1.48e-6, 2e-8))
     co = max(1e-12, np.random.normal(4.7e-7, 4e-9))
     co2 = max(1e-12, np.random.normal(3.3e-4, 6e-6))
@@ -131,6 +132,8 @@ def calculate(data: Dict[str, List[classes.Spectrum]]):
     sample_array = get_spectra_array(data["samples"])
     noisy_samples = np.array([add_noise(sample, snr_db=SNR) for sample in sample_array])
 
+    print(a_constrained.shape)
+    print(sample_array[0].shape)
     batch_lsql = [lsql_batch_solve(a_constrained, sample) for sample in sample_array]
     solutions_lsql = []
     for index, (solution, residual, bound_type) in enumerate(batch_lsql):
@@ -161,7 +164,14 @@ def calculate(data: Dict[str, List[classes.Spectrum]]):
                   f"(relative error {abs((known_value - calculated_value) / known_value) * 100}%)")
         print(f"\tResidual: {residual}")
 
-    run_ica(data["sources"], data["samples"])
+    # run_ica(data["sources"], data["samples"])
+    jade_W = jadeR(sample_array, m=10)
+    unconvoluted = jade_W.dot(sample_array)
+    print(unconvoluted.shape)
+    wn_space = np.linspace(data["samples"][0].WN_min, data["samples"][0].WN_max, data["samples"][0].num_points)
+    for idx, source in enumerate(unconvoluted):
+        plt.figure(f'Source reconstruction {idx+1}')
+        plt.plot(wn_space, abs(source.T))
     solutions = [solutions_lsql, solutions_lsql_noisy]
     solution_titles = ["LSQL method", f"LSQL method with noisy samples (SNR = {SNR})"]
 
