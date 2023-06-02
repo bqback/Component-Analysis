@@ -2,7 +2,7 @@ DATA_PATH = "data/0-4000_1"
 GAS_LIST = ["H2O", "CO2", "O3", "N2O", "CO", "CH4", "O2", "SO2", "NH3"]
 MODEL = "model"
 REQUIRED_SAMPLES = 15
-SNR = 50
+SNR = 25
 TRUE_SOLUTION = {
     "[Non-airy] IAO model, high latitude, winter, H=0": {
         "Pure H2O": 0.000654836697,

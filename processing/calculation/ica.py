@@ -24,14 +24,17 @@ def covariance(x):
 
 
 def correlation(unknown, sources, nica):
-    Cor = np.zeros((nica, sources.shape[0]))
-
     print(unknown.shape)
-    print(sources.shape)
+    print(nica)
+    Cor = np.zeros((nica, sources.shape[0]))
+    sources = np.asmatrix(sources)
     # Matching
     for ii in range(nica):
         for jj in range(sources.shape[0]):
-            y = np.array([unknown[ii, :] / unknown[ii, :].max(), sources[jj, :] / sources[jj, :].max()])
+            y = np.array(
+                [np.asarray(unknown[ii, :] / unknown[ii, :].max())[0],
+                 np.asarray(sources[jj, :] / sources[jj, :].max())[0]]
+            )
             Cor[ii, jj] = abs(np.corrcoef(y)[0, 1])
             if np.isnan(Cor[ii, jj]):
                 Cor[ii, jj] = 0.
